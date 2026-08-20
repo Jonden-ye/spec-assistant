@@ -1,0 +1,9 @@
+﻿fastapi
+uvicorn
+openai
+chromadb
+pdfplumber
+requests
+streamlit
+jieba
+rank_bm25
