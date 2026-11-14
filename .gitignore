@@ -5,3 +5,5 @@ old/
 *.pdf
 *.csv
 .streamlit/secrets.toml
+autocut/data/
+autocut/.venv/

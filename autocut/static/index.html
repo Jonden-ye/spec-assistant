@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>剪间 · 自动剪视频工作台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23110f0c'/%3E%3Cpath d='M7 7h9M7 7v9M25 25h-9M25 25v-9' stroke='%23d6f25c' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body data-ready="0">
+  <header class="top">
+    <div class="brand">
+      <span class="crop" aria-hidden="true"></span>
+      <div>
+        <div class="name">剪间</div>
+        <div class="sub">自动剪视频工作台</div>
+      </div>
+    </div>
+    <div class="totals" id="totals">先放入一条片子</div>
+    <button class="go" id="export" type="button" disabled>导出成片</button>
+  </header>
+
+  <main class="workspace">
+    <aside class="col bay">
+      <div class="bay-head">
+        <h2>素材</h2>
+        <p>在这台机器上分析，不会上传到别处。</p>
+      </div>
+      <div class="actions">
+        <button class="solid" id="pick" type="button">选择视频</button>
+        <button class="ghost" id="sample" type="button">用示例口播试剪</button>
+      </div>
+      <input id="file" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm,.mkv,.avi" hidden>
+      <div class="meta" id="meta">支持 mp4 / mov / webm / mkv，20 分钟以内。</div>
+      <div class="list-head">
+        <span>片段</span>
+        <span id="list-count"></span>
+      </div>
+      <div class="list" id="list">
+        <p class="quiet">剪完之后，每一段会出现在这里。点「去掉」可以把它从成片里拿掉。</p>
+      </div>
+    </aside>
+
+    <section class="stage">
+      <div class="screen" id="screen">
+        <video id="player" playsinline preload="auto"></video>
+        <div class="empty" id="empty">
+          <div class="mark" aria-hidden="true"></div>
+          <h2>把片子放上来</h2>
+          <p>自动找出气口、音量高光和镜头切换。预览只播放留下的部分，满意再导出。</p>
+          <div class="actions">
+            <button class="solid" id="pick-center" type="button">选择视频</button>
+            <button class="ghost" id="sample-center" type="button">用示例口播试剪</button>
+          </div>
+        </div>
+        <div class="veil" id="veil" hidden>
+          <div class="veil-card">
+            <div id="veil-label">正在处理</div>
+            <div class="track"><div id="veil-bar"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="transport">
+        <button class="play" id="play" type="button" aria-label="播放" disabled>▶</button>
+        <div class="clocks">
+          <div class="clock" id="clock">00:00.00</div>
+          <div class="clock-sub" id="clock-sub">成片 00:00.00 / 00:00.00</div>
+        </div>
+        <div class="switch" role="group" aria-label="预览">
+          <button type="button" data-preview="cut" class="on" disabled>成片</button>
+          <button type="button" data-preview="source" disabled>原片</button>
+        </div>
+      </div>
+      <div class="timeline-wrap">
+        <canvas id="timeline" tabindex="0" aria-label="时间轴"></canvas>
+        <div class="edits">
+          <button id="split" type="button" disabled>在播放头切开</button>
+          <button id="toggle" type="button" disabled>保留 / 去掉</button>
+          <button id="reapply" type="button" disabled>重新套用方案</button>
+          <span class="keys">空格播放 · X 保留或去掉 · S 切开 · ← → 进退</span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="col plan">
+      <fieldset id="plan" disabled>
+        <h2>方案</h2>
+        <div class="modes" role="group" aria-label="剪辑方案">
+          <button type="button" data-mode="silence" class="on">
+            <span class="t">去气口</span>
+            <span class="d">删掉停顿，口播直接连上</span>
+          </button>
+          <button type="button" data-mode="highlight">
+            <span class="t">高光</span>
+            <span class="d">按音量挑出最有劲的几段</span>
+          </button>
+          <button type="button" data-mode="scene">
+            <span class="t">镜头</span>
+            <span class="d">按画面切换拆开，再勾掉不要的</span>
+          </button>
+        </div>
+        <div id="fields-silence">
+          <label class="field">静音阈值 <b id="val-threshold">-36 dB</b>
+            <input id="threshold" type="range" min="-55" max="-18" step="1" value="-36">
+          </label>
+          <p class="fine">往右拖，越小的声音越会被当成气口。</p>
+          <label class="field">最短气口 <b id="val-min-silence">0.30 秒</b>
+            <input id="min-silence" type="range" min="0.15" max="1.2" step="0.05" value="0.3">
+          </label>
+          <label class="field">句间留白 <b id="val-pad">0.06 秒</b>
+            <input id="pad" type="range" min="0" max="0.3" step="0.01" value="0.06">
+          </label>
+          <label class="field">丢掉短于 <b id="val-min-keep">0.28 秒</b>
+            <input id="min-keep" type="range" min="0.1" max="1.2" step="0.05" value="0.28">
+          </label>
+        </div>
+        <div id="fields-highlight" hidden>
+          <label class="field">目标时长 <b id="val-target">6.0 秒</b>
+            <input id="target" type="range" min="2" max="60" step="0.1" value="6">
+          </label>
+          <label class="field">单段大约 <b id="val-clip">2.2 秒</b>
+            <input id="clip" type="range" min="0.8" max="8" step="0.1" value="2.2">
+          </label>
+        </div>
+        <div id="fields-scene" hidden>
+          <label class="field">切换灵敏度 <b id="val-scene">0.28</b>
+            <input id="scene" type="range" min="0.08" max="0.7" step="0.02" value="0.28">
+          </label>
+          <p class="fine">往左更敏感，轻微的变化也会被切开。</p>
+          <label class="check"><input id="drop-quiet" type="checkbox"> 去掉基本没声音的镜头</label>
+        </div>
+        <p class="hint" id="hint">上传之后会按模式自动出一版，时间轴上还能改。</p>
+        <div class="dirty" id="dirty" hidden>时间轴已手动改过。调参数不会覆盖它。</div>
+        <div class="aspect" role="group" aria-label="导出画面">
+          <button type="button" data-aspect="original" class="on">原比例</button>
+          <button type="button" data-aspect="16:9">16:9</button>
+          <button type="button" data-aspect="9:16">9:16</button>
+          <button type="button" data-aspect="1:1">1:1</button>
+        </div>
+        <label class="check"><input id="normalize" type="checkbox" checked> 导出时统一响度</label>
+        <p class="fine">竖屏和方形按画面中心裁切，编码为 H.264。</p>
+        <div class="export-progress" id="export-progress" hidden>
+          <div class="track"><div id="export-bar"></div></div>
+          <span id="export-label">正在导出</span>
+        </div>
+        <a id="download" hidden>下载成片</a>
+      </fieldset>
+    </aside>
+  </main>
+
+  <div class="dropveil" id="dropveil" hidden>松开，开始剪</div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script src="/static/plan.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
